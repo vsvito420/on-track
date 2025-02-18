@@ -24,27 +24,34 @@ function App() {
   const [entries, setEntries] = useState<TimeEntry[]>([]);
   const [showCode, setShowCode] = useState(false);
   const [view, setView] = useState('timeline');
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkMode, setIsDarkMode] = useState(() => {
+    const savedMode = localStorage.getItem('darkMode');
+    if (savedMode !== null) {
+      return savedMode === 'true';
+    }
+    return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  });
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [layout, setLayout] = useState<'split' | 'full'>('split');
   const timelineRef = useRef<HTMLDivElement>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDarkMode(prefersDark);
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    const handleChange = (e: MediaQueryListEvent) => setIsDarkMode(e.matches);
-    mediaQuery.addEventListener('change', handleChange);
-
-    return () => mediaQuery.removeEventListener('change', handleChange);
-  }, []);
-
-  useEffect(() => {
     document.documentElement.classList.toggle('dark', isDarkMode);
     document.body.style.backgroundColor = isDarkMode ? '#111827' : '#f3f4f6';
+    localStorage.setItem('darkMode', isDarkMode.toString());
   }, [isDarkMode]);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (localStorage.getItem('darkMode') === null) {
+        setIsDarkMode(e.matches);
+      }
+    };
+    mediaQuery.addEventListener('change', handleChange);
+    return () => mediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   useEffect(() => {
     if (timelineRef.current) {
@@ -101,12 +108,12 @@ function App() {
       return dateB.localeCompare(dateA);
     });
 
-    const allEntries = [];
+    const allEntries: TimeEntry[] = [];
     for (const file of markdownFiles) {
       const content = await file.text();
       const lines = content.split('\n');
-      const parsedEntries = [];
-      let currentEntry = null;
+      const parsedEntries: TimeEntry[] = [];
+      let currentEntry: TimeEntry | null = null;
 
       const date = file.name.split('-').slice(0, 3).join('-');
 
@@ -443,7 +450,9 @@ function App() {
                     multiple
                     accept=".md"
                     onChange={handleFileSelect}
+                    // @ts-ignore
                     webkitdirectory=""
+                    // @ts-ignore
                     directory=""
                   />
                 </label>
