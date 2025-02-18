@@ -28,8 +28,8 @@ interface TimeBlock {
 
 interface TimeEntry {
   completed: boolean;
-  startTime: string;
-  endTime: string;
+  startTime?: string;
+  endTime?: string;
   title: string;
   link: string;
   subTasks: string[];
@@ -95,14 +95,14 @@ function App() {
   const timeBlocks = generateTimeBlocks();
 
   const parseTimeEntry = (line: string, date: string) => {
-    const regex = /- \[([ x])\] (\d{2}:\d{2}) - (\d{2}:\d{2}) (?:####\s*)?(?:\[(.*?)\]\((.*?)\)|(.*))/;
+    const regex = /- \[([ x])\] (?:(\d{2}:\d{2}) - (\d{2}:\d{2}) )?(?:####\s*)?(?:\[(.*?)\]\((.*?)\)|(.*))/;
     const match = line.match(regex);
-    
+
     if (match) {
       return {
         completed: match[1] === 'x',
-        startTime: match[2],
-        endTime: match[3],
+        startTime: match[2] || undefined,
+        endTime: match[3] || undefined,
         title: match[4] || match[6] || '',
         link: match[5] || '',
         subTasks: [],
@@ -173,11 +173,16 @@ function App() {
     for (const [date, dateEntries] of Object.entries(entriesByDate)) {
       const content = dateEntries.map(entry => {
         const checkbox = entry.completed ? '[x]' : '[ ]';
-        const titlePart = entry.link 
+        const titlePart = entry.link
           ? `[${entry.title}](${entry.link})`
           : entry.title;
-        
-        let entryContent = `- ${checkbox} ${entry.startTime} - ${entry.endTime} ${titlePart}\n`;
+
+        let timePart = '';
+        if (entry.startTime && entry.endTime) {
+          timePart = `${entry.startTime} - ${entry.endTime} `;
+        }
+
+        let entryContent = `- ${checkbox} ${timePart}${titlePart}\n`;
         entry.subTasks.forEach(task => {
           entryContent += `  - ${task}\n`;
         });
@@ -188,7 +193,7 @@ function App() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${date}-${new Date(date).toLocaleString('en-us', {weekday: 'long'})}.md`;
+      a.download = `${date}-${new Date(date).toLocaleString('en-us', { weekday: 'long' })}.md`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -213,7 +218,7 @@ function App() {
     const date = new Date(dateStr);
     const days = ['Sonntag', 'Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag', 'Samstag'];
     const months = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
-    
+
     return `${days[date.getDay()]}, ${date.getDate()}. ${months[date.getMonth()]} ${date.getFullYear()}`;
   };
 
@@ -235,10 +240,10 @@ function App() {
     const dateEntries = entries.filter(entry => entry.date === date);
     return dateEntries.map(entry => {
       const checkbox = entry.completed ? '[x]' : '[ ]';
-      const titlePart = entry.link 
+      const titlePart = entry.link
         ? `[${entry.title}](${entry.link})`
         : entry.title;
-      
+
       let entryContent = `- ${checkbox} ${entry.startTime} - ${entry.endTime} ${titlePart}\n`;
       entry.subTasks.forEach(task => {
         entryContent += `  - ${task}\n`;
@@ -264,109 +269,126 @@ function App() {
     };
 
     return (
-    <div ref={setNodeRef} style={style} className="flex gap-4 group relative">
-      <div className="flex flex-col items-center relative">
-        <div {...attributes} {...listeners} className="absolute -left-4 top-1 cursor-grab active:cursor-grabbing p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110">
-          <GripVertical className="h-4 w-4 text-gray-400" />
+      <div ref={setNodeRef} style={style} className="flex gap-4 group relative">
+        <div className="flex flex-col items-center relative">
+          <div {...attributes} {...listeners} className="absolute -left-4 top-1 cursor-grab active:cursor-grabbing p-1 opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110">
+            <GripVertical className="h-4 w-4 text-gray-400" />
+          </div>
+          <div className="text-sm font-medium text-gray-500 dark:text-gray-400 w-16">
+            {entry.startTime}
+          </div>
+          <div className="w-px h-full bg-gray-200 dark:bg-gray-700 group-last:hidden absolute top-6 left-8 bottom-0" />
         </div>
-        <div className="text-sm font-medium text-gray-500 dark:text-gray-400 w-16">
-          {entry.startTime}
-        </div>
-        <div className="w-px h-full bg-gray-200 dark:bg-gray-700 group-last:hidden absolute top-6 left-8 bottom-0" />
-      </div>
-      <div className="flex-1 pb-8">
-        <div 
-          className={`bg-white dark:bg-gray-800 rounded-lg border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${
-            entry.completed ? 'border-green-500 dark:border-green-600' : ''
-          } ${selectedDate === entry.date && selectedEntryIndex === index ? 'ring-2 ring-blue-500' : ''}`}
-          onClick={() => handleEntryClick(entry.date, index)}
-        >
-          <div className="flex items-start gap-3">
-            <input 
-              type="checkbox" 
-              checked={entry.completed}
-              onChange={(e) => {
-                e.stopPropagation();
-                handleEntryEdit(index, 'completed', !entry.completed);
-              }}
-              className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <div className="flex-1">
-              {entry.isEditing ? (
-                <div className="space-y-2" data-color-mode={isDarkMode ? 'dark' : 'light'}>
-                  <input
-                    type="text"
-                    value={entry.title}
-                    onChange={(e) => handleEntryEdit(index, 'title', e.target.value)}
-                    className="w-full px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                  {entry.link && (
+        <div className="flex-1 pb-8">
+          <div
+            className={`bg-white dark:bg-gray-800 rounded-lg border p-4 shadow-sm transition-all duration-200 hover:shadow-md ${entry.completed ? 'border-green-500 dark:border-green-600' : ''
+              } ${selectedDate === entry.date && selectedEntryIndex === index ? 'ring-2 ring-blue-500' : ''}`}
+            onClick={() => handleEntryClick(entry.date, index)}
+          >
+            <div className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={entry.completed}
+                onChange={(e) => {
+                  e.stopPropagation();
+                  handleEntryEdit(index, 'completed', !entry.completed);
+                }}
+                className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              <div className="flex-1">
+                {entry.isEditing ? (
+                  <div className="space-y-2" data-color-mode={isDarkMode ? 'dark' : 'light'}>
+                    <div className="flex gap-2">
+                      <input
+                        type="time"
+                        value={entry.startTime || ''}
+                        onChange={(e) => handleEntryEdit(index, 'startTime', e.target.value)}
+                        className="w-24 px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Startzeit"
+                      />
+                      <input
+                        type="time"
+                        value={entry.endTime || ''}
+                        onChange={(e) => handleEntryEdit(index, 'endTime', e.target.value)}
+                        className="w-24 px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                        onClick={(e) => e.stopPropagation()}
+                        placeholder="Endzeit"
+                      />
+                    </div>
                     <input
                       type="text"
-                      value={entry.link}
-                      onChange={(e) => handleEntryEdit(index, 'link', e.target.value)}
+                      value={entry.title}
+                      onChange={(e) => handleEntryEdit(index, 'title', e.target.value)}
                       className="w-full px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
                       onClick={(e) => e.stopPropagation()}
                     />
-                  )}
-                  <MDEditor
-                    value={entry.subTasks.join('\n')}
-                    onChange={(value) => handleEntryEdit(index, 'subTasks', (value || '').split('\n'))}
-                    preview="edit"
-                    height={150}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-              ) : (
-                <>
-                  {entry.link ? (
-                    <a 
-                      href={entry.link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium"
+                    {entry.link && (
+                      <input
+                        type="text"
+                        value={entry.link}
+                        onChange={(e) => handleEntryEdit(index, 'link', e.target.value)}
+                        className="w-full px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+                        onClick={(e) => e.stopPropagation()}
+                      />
+                    )}
+                    <MDEditor
+                      value={entry.subTasks.join('\n')}
+                      onChange={(value) => handleEntryEdit(index, 'subTasks', (value || '').split('\n'))}
+                      preview="edit"
+                      height={150}
                       onClick={(e) => e.stopPropagation()}
-                    >
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.title}</ReactMarkdown>
-                      <Link className="h-4 w-4" />
-                    </a>
-                  ) : (
-                    <span className="font-medium text-gray-900 dark:text-gray-100">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.title}</ReactMarkdown>
-                    </span>
-                  )}
-                  {entry.subTasks.length > 0 && (
-                    <ul className="mt-2 space-y-1">
-                      {entry.subTasks.map((task, taskIndex) => (
-                        <li key={taskIndex} className="text-gray-600 dark:text-gray-400 text-sm flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500"></span>
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{task}</ReactMarkdown>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              )}
-            </div>
-            <div className="flex flex-col gap-2">
-              <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                {entry.endTime}
+                    />
+                  </div>
+                ) : (
+                  <>
+                    {entry.link ? (
+                      <a
+                        href={entry.link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-500 hover:text-blue-600 flex items-center gap-1 font-medium"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.title}</ReactMarkdown>
+                        <Link className="h-4 w-4" />
+                      </a>
+                    ) : (
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{entry.title}</ReactMarkdown>
+                      </span>
+                    )}
+                    {entry.subTasks.length > 0 && (
+                      <ul className="mt-2 space-y-1">
+                        {entry.subTasks.map((task, taskIndex) => (
+                          <li key={taskIndex} className="text-gray-600 dark:text-gray-400 text-sm flex items-center gap-2">
+                            <span className="w-1.5 h-1.5 rounded-full bg-gray-400 dark:bg-gray-500"></span>
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{task}</ReactMarkdown>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </>
+                )}
               </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleEntryEdit(index, 'isEditing', !entry.isEditing);
-                }}
-                className="text-blue-500 hover:text-blue-600"
-              >
-                {entry.isEditing ? 'Save' : 'Edit'}
-              </button>
+              <div className="flex flex-col gap-2">
+                <div className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                  {entry.endTime}
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleEntryEdit(index, 'isEditing', !entry.isEditing);
+                  }}
+                  className="text-blue-500 hover:text-blue-600"
+                >
+                  {entry.isEditing ? 'Save' : 'Edit'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
     );
   };
 
@@ -390,11 +412,10 @@ function App() {
             </h2>
             <div className="space-y-4">
               {entriesByDate[date].map((entry, index) => (
-                <div 
-                  key={index} 
-                  className={`border-l-4 border-blue-500 pl-3 py-2 cursor-pointer transition-all duration-200 ${
-                    selectedDate === date && selectedEntryIndex === index ? 'bg-blue-50 dark:bg-blue-900/20' : ''
-                  }`}
+                <div
+                  key={index}
+                  className={`border-l-4 border-blue-500 pl-3 py-2 cursor-pointer transition-all duration-200 ${selectedDate === date && selectedEntryIndex === index ? 'bg-blue-50 dark:bg-blue-900/20' : ''
+                    }`}
                   onClick={() => handleEntryClick(date, index)}
                 >
                   <div className="flex items-start gap-2">
@@ -409,10 +430,10 @@ function App() {
                     />
                     <div className="flex-1">
                       <div className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                        {entry.startTime} - {entry.endTime}
+                        {entry.startTime && entry.endTime ? `${entry.startTime} - ${entry.endTime}` : 'Keine Zeit'}
                       </div>
                       {entry.link ? (
-                        <a 
+                        <a
                           href={entry.link}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -462,16 +483,16 @@ function App() {
       const overId = over.id.toString();
       const [activeDate] = activeId.split('|');
       const [overDate] = overId.split('|');
-      
+
       if (activeDate === overDate) {
         setEntries((items) => {
-          const oldIndex = items.findIndex(item => 
+          const oldIndex = items.findIndex(item =>
             `${item.date}|${item.startTime}` === activeId
           );
-          const newIndex = items.findIndex(item => 
+          const newIndex = items.findIndex(item =>
             `${item.date}|${item.startTime}` === overId
           );
-          
+
           if (oldIndex !== -1 && newIndex !== -1) {
             const result = arrayMove(items, oldIndex, newIndex);
             setHasUnsavedChanges(true);
@@ -486,11 +507,10 @@ function App() {
   const ListView = () => (
     <div className="space-y-2">
       {entries.map((entry, index) => (
-        <div 
-          key={index} 
-          className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${
-            selectedDate === entry.date && selectedEntryIndex === index ? 'ring-2 ring-blue-500' : ''
-          }`}
+        <div
+          key={index}
+          className={`bg-white dark:bg-gray-800 rounded-lg border p-3 shadow-sm hover:shadow-md transition-all duration-200 cursor-pointer ${selectedDate === entry.date && selectedEntryIndex === index ? 'ring-2 ring-blue-500' : ''
+            }`}
           onClick={() => handleEntryClick(entry.date, index)}
         >
           <div className="flex items-center gap-3">
@@ -504,10 +524,10 @@ function App() {
               className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
             <span className="text-sm font-medium text-gray-500 dark:text-gray-400 w-24">
-              {entry.startTime} - {entry.endTime}
+              {entry.startTime && entry.endTime ? `${entry.startTime} - ${entry.endTime}` : 'Keine Zeit'}
             </span>
             {entry.link ? (
-              <a 
+              <a
                 href={entry.link}
                 target="_blank"
                 rel="noopener noreferrer"
@@ -566,8 +586,9 @@ function App() {
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
                 >
                   {view === 'timeline' ? <Calendar className="h-4 w-4" /> :
-                   view === 'week' ? <Layout className="h-4 w-4" /> :
-                   <List className="h-4 w-4" />}
+                    view === 'week' ? <Layout className="h-4 w-4" /> :
+                      view === 'list' ? <List className="h-4 w-4" /> :
+                        <Code className="h-4 w-4" />}
                   <span className="text-sm font-medium capitalize">{view} Ansicht</span>
                 </button>
                 <label className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors cursor-pointer shadow-sm">
@@ -623,7 +644,7 @@ function App() {
             </div>
 
             <div className="relative h-[calc(100vh-7rem)]">
-              <div 
+              <div
                 ref={timelineRef}
                 className="h-full overflow-y-auto pr-4 -mr-4 pb-16"
               >
@@ -644,9 +665,9 @@ function App() {
                             strategy={verticalListSortingStrategy}
                           >
                             {groupedEntries[date].map((entry, index) => (
-                              <SortableTimelineEntry 
+                              <SortableTimelineEntry
                                 key={`${entry.date}|${entry.startTime}`}
-                                entry={entry} 
+                                entry={entry}
                                 index={index}
                               />
                             ))}
@@ -658,6 +679,7 @@ function App() {
                 )}
                 {view === 'week' && <WeekView />}
                 {view === 'list' && <ListView />}
+                {view === 'edit' && <EditView setEntries={setEntries} selectedDate={selectedDate} />}
               </div>
 
               {/* Touch Navigation Buttons */}
@@ -699,5 +721,64 @@ function App() {
     </div>
   );
 }
+
+const EditView = ({ setEntries, selectedDate }: { setEntries: React.Dispatch<React.SetStateAction<TimeEntry[]>>; selectedDate: string | null }) => {
+  const [newEntry, setNewEntry] = useState<Omit<TimeEntry, 'date' | 'subTasks'>>({
+    completed: false,
+    startTime: undefined,
+    endTime: undefined,
+    title: '',
+    link: '',
+  });
+
+  const handleCreateEntry = () => {
+    setEntries(prev => [...prev, { ...newEntry, date: selectedDate || new Date().toISOString().slice(0, 10), subTasks: [] }]);
+    setNewEntry({ completed: false, startTime: undefined, endTime: undefined, title: '', link: '' });
+  };
+
+  return (
+    <div className="p-4">
+      <h2 className="text-lg font-semibold mb-4">Edit View</h2>
+      <div className="space-y-2">
+        <input
+          type="text"
+          placeholder="Titel"
+          value={newEntry.title}
+          onChange={e => setNewEntry({ ...newEntry, title: e.target.value })}
+          className="w-full px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+        />
+        <input
+          type="text"
+          placeholder="Link"
+          value={newEntry.link}
+          onChange={e => setNewEntry({ ...newEntry, link: e.target.value })}
+          className="w-full px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+        />
+        <div className="flex gap-2">
+          <input
+            type="time"
+            placeholder="Startzeit"
+            value={newEntry.startTime || ''}
+            onChange={e => setNewEntry({ ...newEntry, startTime: e.target.value })}
+            className="w-24 px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+          />
+          <input
+            type="time"
+            placeholder="Endzeit"
+            value={newEntry.endTime || ''}
+            onChange={e => setNewEntry({ ...newEntry, endTime: e.target.value })}
+            className="w-24 px-2 py-1 rounded border focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600"
+          />
+        </div>
+        <button
+          onClick={handleCreateEntry}
+          className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors shadow-sm"
+        >
+          Eintrag erstellen
+        </button>
+      </div>
+    </div>
+  );
+};
 
 export default App;
